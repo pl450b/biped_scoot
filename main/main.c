@@ -1,6 +1,3 @@
-        // GPIO connects to the PWM signal line, skip 25
-
-
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
@@ -126,9 +123,8 @@ static esp_err_t init_servo(servo_config_t *servo, mcpwm_timer_handle_t *timer, 
     return ESP_OK;
 }
 
-void app_main(void)
+void app_main()
 {
-    double front_angle, rear_angle, x, y;
     ESP_LOGI(TAG, "Create timer and operator");
     mcpwm_timer_handle_t timer1 = NULL;
     mcpwm_timer_handle_t timer2 = NULL;
@@ -164,59 +160,12 @@ void app_main(void)
     ESP_ERROR_CHECK(mcpwm_timer_start_stop(timer1, MCPWM_TIMER_START_NO_STOP));
     ESP_ERROR_CHECK(mcpwm_timer_start_stop(timer2, MCPWM_TIMER_START_NO_STOP));
 
-    // set_servo_angle(&Servo1, -45);
-    // set_servo_angle(&Servo3, 45);
-    // vTaskDelay(pdMS_TO_TICKS(3000));
-    // set_servo_angle(&Servo1, 90);
-    // set_servo_angle(&Servo3, -90);
-    // vTaskDelay(pdMS_TO_TICKS(500));
-    // set_servo_angle(&Servo1, 0);
-    // set_servo_angle(&Servo3, 0);
-    // ESP_LOGI(TAG, "Setup.....");
-    // vTaskDelay(pdMS_TO_TICKS(3000));
-
     while(1) {
-        x = 12; y = 5;
-        // calc_angle(x, y, &front_angle, &rear_angle);
-        // set_servo_angle(&Servo1, front_angle);
-        // set_servo_angle(&Servo3, rear_angle);
-        // ESP_LOGI(TAG, "X = %f, Y = %f, front angle = %f, rear angle = %f", x, y, front_angle, rear_angle);
-        // vTaskDelay(pdMS_TO_TICKS(2000));
-
-        // x = 12; y = 53;
-        // calc_angle(x, y, &front_angle, &rear_angle);
-        // set_servo_angle(&Servo1, front_angle);
-        // set_servo_angle(&Servo3, rear_angle);
-        // ESP_LOGI(TAG, "X = %f, Y = %f, front angle = %f, rear angle = %f", x, y, front_angle, rear_angle);
-        // vTaskDelay(pdMS_TO_TICKS(2000));
-
-        for(int i = 5; i < 53; i++) {
-            x = 12;
-            y = i;
-            calc_angle(x, y, &front_angle, &rear_angle);
-            set_servo_angle(&Servo2, front_angle);
-            set_servo_angle(&Servo1, front_angle);
-            set_servo_angle(&Servo4, rear_angle);
-            set_servo_angle(&Servo3, rear_angle);
-            ESP_LOGI(TAG, "X = %f, Y = %f, front angle = %f, rear angle = %f", x, y, front_angle, rear_angle);
-            vTaskDelay(pdMS_TO_TICKS(50));
-        }
-
-        vTaskDelay(pdMS_TO_TICKS(2000));
-
-        for(int i = 53; i > 5; i--) {
-            x = 12;
-            y = i;
-            calc_angle(x, y, &front_angle, &rear_angle);
-            set_servo_angle(&Servo2, front_angle);
-            set_servo_angle(&Servo1, front_angle);
-            set_servo_angle(&Servo4, rear_angle);
-            set_servo_angle(&Servo3, rear_angle);
-            ESP_LOGI(TAG, "X = %f, Y = %f, front angle = %f, rear angle = %f", x, y, front_angle, rear_angle);
-            vTaskDelay(pdMS_TO_TICKS(50));
-        }
-
-
-        
+      ESP_LOGI(TAG, "Click one hahaha");
+       set_servo_angle(&Servo2, 0);
+       vTaskDelay(pdMS_TO_TICKS(3000));
+      ESP_LOGI(TAG, "Click two hahahaha");
+       set_servo_angle(&Servo2, 90);
+       vTaskDelay(pdMS_TO_TICKS(3000));
     }
 }
