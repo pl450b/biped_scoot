@@ -119,14 +119,14 @@ esp_err_t init_legs(leg_t* left_leg, leg_t* right_leg) {
         ESP_LOGE(TAG, "Failed to init front left servo: %s", esp_err_to_name(ret));
         return ret;
     }
-    left_leg->front_servo.angle_offset = 135;
+    left_leg->front_servo.angle_offset = 145;
     
     ret = init_servo(&left_leg->rear_servo, &left_leg->timer, BACK_LEFT_SERVO, 0);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to init rear left servo: %s", esp_err_to_name(ret));
         return ret;
     }
-    left_leg->rear_servo.angle_offset = 135;
+    left_leg->rear_servo.angle_offset = 138;
     ESP_LOGI(TAG, "Left leg setup!");
 
 
@@ -136,14 +136,14 @@ esp_err_t init_legs(leg_t* left_leg, leg_t* right_leg) {
         ESP_LOGE(TAG, "Failed to init front right servo: %s", esp_err_to_name(ret));
         return ret;
     }
-    right_leg->front_servo.angle_offset = 135;
+    right_leg->front_servo.angle_offset = 145;
 
     ret = init_servo(&right_leg->rear_servo, &right_leg->timer, BACK_RIGHT_SERVO, 1);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to init rear right servo: %s", esp_err_to_name(ret));
         return ret;
     }
-    right_leg->rear_servo.angle_offset = 135;
+    right_leg->rear_servo.angle_offset = 138;
 
     ESP_LOGI(TAG, "Right leg setup!");
 

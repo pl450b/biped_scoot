@@ -53,15 +53,26 @@ void app_main()
 
     while(1) {
         
-
-        set_leg_pos(&left_leg, REAR_OFFSET/2, 60);
-        set_leg_pos(&right_leg, REAR_OFFSET/2, 60);
-
-        vTaskDelay(pdMS_TO_TICKS(1000));   
-        set_leg_pos(&left_leg, REAR_OFFSET/2, 15);
-        set_leg_pos(&right_leg, REAR_OFFSET/2, 15);
-        
+        for(int i = 15; i <=60; i++) {
+            set_leg_pos(&left_leg, REAR_OFFSET/2, i);
+            set_leg_pos(&right_leg, REAR_OFFSET/2, i);
+            vTaskDelay(pdMS_TO_TICKS(50));
+        }
         vTaskDelay(pdMS_TO_TICKS(1000)); 
 
+        for(int i = 60; i >= 15; i--) {
+            set_leg_pos(&left_leg, REAR_OFFSET/2, i);
+            set_leg_pos(&right_leg, REAR_OFFSET/2, i);
+            vTaskDelay(pdMS_TO_TICKS(50));
+        }
+        vTaskDelay(pdMS_TO_TICKS(1000)); 
+
+
+        set_servo_angle(&left_leg.front_servo, -45);
+        set_servo_angle(&right_leg.front_servo, 45);
+        set_servo_angle(&left_leg.rear_servo, 45);
+        set_servo_angle(&right_leg.rear_servo, -45);
+
+        vTaskDelay(pdMS_TO_TICKS(4000)); 
     }
 }
