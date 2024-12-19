@@ -51,7 +51,7 @@ void calc_angle(int x, int y, int *front_angle, int *rear_angle) {
     b1 = acos((pow(UPPER_LEG_LEN, 2) - pow(LOWER_LEG_LEN, 2) - pow(hypo1, 2))/(-2*LOWER_LEG_LEN*hypo1));
     b2 = acos((pow(UPPER_LEG_LEN, 2) - pow(LOWER_LEG_LEN, 2) - pow(hypo2, 2))/(-2*LOWER_LEG_LEN*hypo2));
 
-    *front_angle = (180*(a1 + b1) / PI) - 135;      // -135 to account for servo horn setting
+    *front_angle = (180*(a1 + b1) / PI);      // -135 to account for servo horn setting
     *rear_angle = (180*(a2 + b2) / PI);
 }
 
