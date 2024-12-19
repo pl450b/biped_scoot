@@ -18,6 +18,7 @@ typedef struct {
     servo_config_t front_servo;
     servo_config_t rear_servo;
     mcpwm_timer_handle_t timer;
+    bool left_leg;
 } leg_t;
 
 static inline uint32_t angle_to_compare(int angle);

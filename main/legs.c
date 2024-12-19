@@ -89,6 +89,9 @@ esp_err_t init_servo(servo_config_t *servo, mcpwm_timer_handle_t *timer, int gpi
 }
 
 esp_err_t init_legs(leg_t* left_leg, leg_t* right_leg) {
+    // Set internal leg identifies (for angle calculation)
+    left_leg->left_leg = true;
+    right_leg->left_leg = false;
     // Setup Timers
     left_leg->timer = NULL;
     right_leg->timer = NULL;
@@ -169,8 +172,16 @@ esp_err_t set_leg_pos(leg_t* leg, int x, int y) {
     int front_angle, rear_angle;
     calc_angle(x, y, &front_angle, &rear_angle);
 
-    front_angle = front_angle - leg->front_servo.angle_offset;
-    rear_angle = leg->rear_servo.angle_offset - rear_angle;
+    if(leg->left_leg) {
+        front_angle = front_angle - leg->front_servo.angle_offset;
+        rear_angle = leg->rear_servo.angle_offset - rear_angle;
+    }
+    else {
+            front_angle = leg->front_servo.angle_offset - front_angle;
+            rear_angle = rear_angle - leg->rear_servo.angle_offset;
+    }
+
+
 
     set_servo_angle(&leg->front_servo, front_angle);
     set_servo_angle(&leg->rear_servo, rear_angle);
