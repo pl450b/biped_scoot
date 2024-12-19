@@ -1,0 +1,1 @@
+void change_int(int* input);
