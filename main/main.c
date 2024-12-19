@@ -54,12 +54,14 @@ void app_main()
     while(1) {
         
 
-        // set_leg_pos(&left_leg, REAR_OFFSET/2, 60);
-        // set_leg_pos(&right_leg, REAR_OFFSET/2, 60);
-        // vTaskDelay(pdMS_TO_TICKS(1000));   
-        // set_leg_pos(&left_leg, REAR_OFFSET/2, 15);
-        // set_leg_pos(&right_leg, REAR_OFFSET/2, 15);
-        // vTaskDelay(pdMS_TO_TICKS(1000)); 
+        set_leg_pos(&left_leg, REAR_OFFSET/2, 60);
+        set_leg_pos(&right_leg, REAR_OFFSET/2, 60);
+
+        vTaskDelay(pdMS_TO_TICKS(1000));   
+        set_leg_pos(&left_leg, REAR_OFFSET/2, 15);
+        set_leg_pos(&right_leg, REAR_OFFSET/2, 15);
+        
+        vTaskDelay(pdMS_TO_TICKS(1000)); 
 
     }
 }

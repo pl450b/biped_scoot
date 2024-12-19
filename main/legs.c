@@ -51,7 +51,7 @@ void calc_angle(int x, int y, int *front_angle, int *rear_angle) {
     b1 = acos((pow(UPPER_LEG_LEN, 2) - pow(LOWER_LEG_LEN, 2) - pow(hypo1, 2))/(-2*LOWER_LEG_LEN*hypo1));
     b2 = acos((pow(UPPER_LEG_LEN, 2) - pow(LOWER_LEG_LEN, 2) - pow(hypo2, 2))/(-2*LOWER_LEG_LEN*hypo2));
 
-    *front_angle = (180*(a1 + b1) / PI);      // -135 to account for servo horn setting
+    *front_angle = (180*(a1 + b1) / PI) - 135;      // -135 to account for servo horn setting
     *rear_angle = (180*(a2 + b2) / PI);
 }
 
@@ -116,14 +116,14 @@ esp_err_t init_legs(leg_t* left_leg, leg_t* right_leg) {
         ESP_LOGE(TAG, "Failed to init front left servo: %s", esp_err_to_name(ret));
         return ret;
     }
-    left_leg->front_servo.angle_offset = 0;
+    left_leg->front_servo.angle_offset = 135;
     
     ret = init_servo(&left_leg->rear_servo, &left_leg->timer, BACK_LEFT_SERVO, 0);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to init rear left servo: %s", esp_err_to_name(ret));
         return ret;
     }
-    left_leg->rear_servo.angle_offset = 0;
+    left_leg->rear_servo.angle_offset = 135;
     ESP_LOGI(TAG, "Left leg setup!");
 
 
@@ -133,14 +133,14 @@ esp_err_t init_legs(leg_t* left_leg, leg_t* right_leg) {
         ESP_LOGE(TAG, "Failed to init front right servo: %s", esp_err_to_name(ret));
         return ret;
     }
-    right_leg->front_servo.angle_offset = 0;
+    right_leg->front_servo.angle_offset = 135;
 
     ret = init_servo(&right_leg->rear_servo, &right_leg->timer, BACK_RIGHT_SERVO, 1);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to init rear right servo: %s", esp_err_to_name(ret));
         return ret;
     }
-    right_leg->rear_servo.angle_offset = 0;
+    right_leg->rear_servo.angle_offset = 135;
 
     ESP_LOGI(TAG, "Right leg setup!");
 
@@ -169,8 +169,8 @@ esp_err_t set_leg_pos(leg_t* leg, int x, int y) {
     int front_angle, rear_angle;
     calc_angle(x, y, &front_angle, &rear_angle);
 
-    front_angle = front_angle + leg->front_servo.angle_offset;
-    rear_angle = rear_angle + leg->rear_servo.angle_offset;
+    front_angle = front_angle - leg->front_servo.angle_offset;
+    rear_angle = leg->rear_servo.angle_offset - rear_angle;
 
     set_servo_angle(&leg->front_servo, front_angle);
     set_servo_angle(&leg->rear_servo, rear_angle);
