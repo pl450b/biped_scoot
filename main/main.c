@@ -2,6 +2,7 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "driver/mcpwm_prelude.h"
+#include "driver/uart.h"
 #include "math.h"
 
 #include "legs.h" // IDK if I need this??
@@ -10,20 +11,18 @@
 #include "esp_system.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
+#include "esp_err.h"
 #include "nvs_flash.h"
 #include "lwip/sockets.h"
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
-
 #define WIFI_SSID                   SECRET_WIFI_SSID
 #define WIFI_PASS                   SECRET_WIFI_PASS
 #define PORT                        SECRET_PORT                 // Port of the server
 #define SERVER_IP                   "192.168.4.1"   // Default IP of ESP32 AP mode
 #define EXAMPLE_ESP_MAXIMUM_RETRY   10
-
-
 
 #define FRONT_LEFT_SERVO             32
 #define BACK_LEFT_SERVO              33 
@@ -40,39 +39,89 @@ static const char *TAG = "Robot";
 #define SERVO_TIMEBASE_RESOLUTION_HZ 1000000  // 1MHz, 1us per tick
 #define SERVO_TIMEBASE_PERIOD        20000    // 20000 ticks, 20ms
 
+int left_x, left_y, right_x, right_y;
+leg_t left_leg, right_leg;
+static const int RX_BUF_SIZE = 1024;
+
+static void update_legs(void) {
+    set_leg_pos(&left_leg, left_x, left_y);
+    set_leg_pos(&right_leg, right_x, right_y);
+    ESP_LOGI("LEG UPDATE", "Set left leg to (%i,%i) and right leg to (%i,%i)", left_x, left_y, right_x, right_y);
+}
+
+static void uart_task(void *arg) {
+    uint8_t data[1024];
+    while(1) {
+        int len = uart_read_bytes(UART_NUM_0, data, 1023, 100);
+        uart_flush_input(UART_NUM_0);
+        if(len > 0) {
+            data[len] = '\0'; // Terminate string
+            ESP_LOGI("UART DATA", "Received %s", (char *)data);
+            
+        }
+    }
+}
+
+void init_uart(void)
+{
+    const uart_config_t uart_config = {
+        .baud_rate = 115200,
+        .data_bits = UART_DATA_8_BITS,
+        .parity = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .source_clk = UART_SCLK_DEFAULT,
+    };
+    // We won't use a buffer for sending data.
+    uart_driver_install(UART_NUM_0, RX_BUF_SIZE * 2, 0, 0, NULL, 0);
+    uart_param_config(UART_NUM_0, &uart_config);
+}
+
+static void rx_task(void *arg)
+{
+    static const char *RX_TASK_TAG = "RX_TASK";
+    esp_log_level_set(RX_TASK_TAG, ESP_LOG_INFO);
+    uint8_t* data = (uint8_t*) malloc(RX_BUF_SIZE + 1);
+    while (1) {
+        const int rxBytes = uart_read_bytes(UART_NUM_0, data, RX_BUF_SIZE, 1000 / portTICK_PERIOD_MS);
+        if (rxBytes > 0) {
+            data[rxBytes] = 0;
+            ESP_LOGI(RX_TASK_TAG, "Read %d bytes: '%s'", rxBytes, data);
+            switch(data[0]) {
+                case 'w': left_y -= 1;
+                case 'a': left_x -= 1;
+                case 's': left_y += 1;
+                case 'd': left_x += 1;
+                case 'k': right_y -= 1;
+                case 'h': right_x -= 1;
+                case 'i': right_y += 1;
+                case 'l': right_x += 1;
+                default: ESP_LOGI("UART TASK", "wrong data received");
+            }
+        update_legs();
+        }
+    }
+    free(data);
+}
 
 void app_main()
 {
-    leg_t left_leg, right_leg;
-    
+    init_uart();
+
     esp_err_t ret = init_legs(&left_leg, &right_leg);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to set servo angle: %s", esp_err_to_name(ret));
         return;
     }
 
-    while(1) {
-        
-        for(int i = 15; i <=60; i++) {
-            set_leg_pos(&left_leg, REAR_OFFSET/2, i);
-            set_leg_pos(&right_leg, REAR_OFFSET/2, i);
-            vTaskDelay(pdMS_TO_TICKS(50));
-        }
-        vTaskDelay(pdMS_TO_TICKS(1000)); 
+    right_x = REAR_OFFSET/2;
+    right_y = 20;
+    left_x = REAR_OFFSET/2;
+    left_y = 20;
 
-        for(int i = 60; i >= 15; i--) {
-            set_leg_pos(&left_leg, REAR_OFFSET/2, i);
-            set_leg_pos(&right_leg, REAR_OFFSET/2, i);
-            vTaskDelay(pdMS_TO_TICKS(50));
-        }
-        vTaskDelay(pdMS_TO_TICKS(1000)); 
+    xTaskCreate(rx_task, "uart_rx_task", 1024 * 2, NULL, 10, NULL);
+    // xTaskCreate(uart_task, "uart_task", 2048, NULL, 10, NULL);
+    ESP_LOGI("SYSTEM", "uart receive task started");
 
 
-        set_servo_angle(&left_leg.front_servo, -45);
-        set_servo_angle(&right_leg.front_servo, 45);
-        set_servo_angle(&left_leg.rear_servo, 45);
-        set_servo_angle(&right_leg.rear_servo, -45);
-
-        vTaskDelay(pdMS_TO_TICKS(4000)); 
-    }
 }
