@@ -3,7 +3,9 @@
 #include "esp_log.h"
 #include "driver/mcpwm_prelude.h"
 #include "driver/uart.h"
+
 #include "math.h"
+#include "stdlib.h"
 
 #include "legs.h" // IDK if I need this??
 #include "secrets.h"
@@ -39,6 +41,7 @@ static const char *TAG = "Robot";
 #define SERVO_TIMEBASE_RESOLUTION_HZ 1000000  // 1MHz, 1us per tick
 #define SERVO_TIMEBASE_PERIOD        20000    // 20000 ticks, 20ms
 
+int state = 0;
 int left_x, left_y, right_x, right_y;
 leg_t left_leg, right_leg;
 static const int RX_BUF_SIZE = 1024;
@@ -69,28 +72,32 @@ static void rx_task(void *arg)
     static const char *RX_TASK_TAG = "RX_TASK";
     esp_log_level_set(RX_TASK_TAG, ESP_LOG_INFO);
     uint8_t* data = (uint8_t*) malloc(RX_BUF_SIZE + 1);
+
+    int servo_sel = 0;
+    int servo_angle = 0;
     while (1) {
         const int rxBytes = uart_read_bytes(UART_NUM_0, data, RX_BUF_SIZE, 100 / portTICK_PERIOD_MS);
         if (rxBytes > 0) {
             data[rxBytes] = 0;
-            // ESP_LOGI(RX_TASK_TAG, "Read %d bytes: '%s'", rxBytes, data);
-            switch(data[0]) {
-                case 'w': left_y += 5; break;
-                case 'a': left_x += 5; break;
-                case 's': left_y -= 5; break;
-                case 'd': left_x -= 5; break;
-                case 'i': right_y += 5; break;
-                case 'j': right_x += 5; break;
-                case 'k': right_y -= 5; break;
-                case 'l': right_x -= 5; break;
-                case 'r': left_x = 15;
-                          left_y =  15;
-                          right_x = 15;
-                          right_y = 15; 
-                          break;
-                default: ESP_LOGI("UART TASK", "wrong data received: %c", data[0]); break; 
+            ESP_LOGI(RX_TASK_TAG, "Read %d bytes: '%s'", rxBytes, data);
+            if(state == 0) {
+                state = 1;
+                servo_sel = atoi((const char*)data);
+                ESP_LOGI(RX_TASK_TAG, "Servo %i selected", servo_sel);       
             }
-        update_legs();
+            else if(state == 1) {
+                state = 0;
+                servo_angle = atoi((const char*)data);
+                ESP_LOGI(RX_TASK_TAG, "Servo %i set to angle %i", servo_sel, servo_angle);
+                switch(servo_sel) {
+                    case 1: set_servo_angle(&left_leg.front_servo, servo_angle); break;
+                    case 2: set_servo_angle(&left_leg.rear_servo, servo_angle); break;
+                    case 3: set_servo_angle(&right_leg.front_servo, servo_angle); break;
+                    case 4: set_servo_angle(&right_leg.rear_servo, servo_angle); break;
+                    default: ESP_LOGE(RX_TASK_TAG, "Bad Servo selection"); break; 
+                }
+            }
+            
         }
     }
     free(data);

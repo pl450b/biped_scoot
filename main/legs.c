@@ -181,7 +181,7 @@ esp_err_t set_leg_pos(leg_t* leg, int x, int y) {
             rear_angle = rear_angle - leg->rear_servo.angle_offset;
     }
 
-
+    ESP_LOGI("LEG", "Set leg angles to %i, %i", front_angle, rear_angle);
 
     set_servo_angle(&leg->front_servo, front_angle);
     set_servo_angle(&leg->rear_servo, rear_angle);
