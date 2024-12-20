@@ -46,7 +46,7 @@ static const int RX_BUF_SIZE = 1024;
 static void update_legs(void) {
     set_leg_pos(&left_leg, left_x, left_y);
     set_leg_pos(&right_leg, right_x, right_y);
-    ESP_LOGI("LEG UPDATE", "Set left leg to (%i,%i) and right leg to (%i,%i)", left_x, left_y, right_x, right_y);
+    // ESP_LOGI("LEG UPDATE", "Set left leg to (%i,%i) and right leg to (%i,%i)", left_x, left_y, right_x, right_y);
 }
 
 static void uart_task(void *arg) {
@@ -86,17 +86,18 @@ static void rx_task(void *arg)
         const int rxBytes = uart_read_bytes(UART_NUM_0, data, RX_BUF_SIZE, 1000 / portTICK_PERIOD_MS);
         if (rxBytes > 0) {
             data[rxBytes] = 0;
-            ESP_LOGI(RX_TASK_TAG, "Read %d bytes: '%s'", rxBytes, data);
+            // ESP_LOGI(RX_TASK_TAG, "Read %d bytes: '%s'", rxBytes, data);
             switch(data[0]) {
-                case 'w': left_y -= 1;
-                case 'a': left_x -= 1;
-                case 's': left_y += 1;
-                case 'd': left_x += 1;
-                case 'k': right_y -= 1;
-                case 'h': right_x -= 1;
-                case 'i': right_y += 1;
-                case 'l': right_x += 1;
-                default: ESP_LOGI("UART TASK", "wrong data received");
+                case 'w': left_y += 5; break;
+                case 'a': left_x += 5; break;
+                case 's': left_y -= 5; break;
+                case 'd': left_x -= 5; break;
+                case 'i': right_y += 5; break;
+                case 'j': right_x += 5; break;
+                case 'k': right_y -= 5; break;
+                case 'l': right_x -= 5; break;
+                case 'r': left_x = left_y = right_x = right_y = 15; break;
+                default: ESP_LOGI("UART TASK", "wrong data received: %c", data[0]); break; 
             }
         update_legs();
         }
