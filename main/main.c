@@ -24,17 +24,9 @@
 #define SERVER_IP                   "192.168.4.1"   // Default IP of ESP32 AP mode
 #define EXAMPLE_ESP_MAXIMUM_RETRY   10
 
-#define FRONT_LEFT_SERVO             32
-#define BACK_LEFT_SERVO              33 
-#define BACK_RIGHT_SERVO             26
-#define FRONT_RIGHT_SERVO            27
-
 static const char *TAG = "Robot";
 
-#define UPPER_LEG_LEN           40
-#define LOWER_LEG_LEN           24
 #define REAR_OFFSET             21
-#define PI                      3.14159
 
 #define SERVO_TIMEBASE_RESOLUTION_HZ 1000000  // 1MHz, 1us per tick
 #define SERVO_TIMEBASE_PERIOD        20000    // 20000 ticks, 20ms
@@ -45,7 +37,8 @@ static const int RX_BUF_SIZE = 1024;
 
 static void update_legs(void) {
     set_leg_pos(&left_leg, left_x, left_y);
-    set_leg_pos(&right_leg, right_x, right_y);
+    set_leg_pos(&right_leg, left_x, left_y);
+    // set_leg_pos(&right_leg, right_x, right_y);
     ESP_LOGI("LEG UPDATE", "Set left leg to (%i,%i) and right leg to (%i,%i)", left_x, left_y, right_x, right_y);
 }
 

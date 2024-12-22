@@ -4,8 +4,8 @@
 #include "help.h"
 
 #define REAR_OFFSET     21
-#define LOWER_LEG_LEN   24
-#define UPPER_LEG_LEN   40
+#define LOWER_LEG_LEN   40
+#define UPPER_LEG_LEN   24
 #define PI              3.14159
 
 
@@ -23,8 +23,8 @@ void calc_leg_angles(int x, int y, int* angle1, int* angle2) {
     b1 = acos((pow(UPPER_LEG_LEN, 2) - pow(LOWER_LEG_LEN, 2) - pow(hypo1, 2))/(-2*LOWER_LEG_LEN*hypo1));
     b2 = acos((pow(UPPER_LEG_LEN, 2) - pow(LOWER_LEG_LEN, 2) - pow(hypo2, 2))/(-2*LOWER_LEG_LEN*hypo2));
 
-    *angle1 = (180*(a1 + b1) / PI);
-    *angle2 = (180*(a2 + b2) / PI);
+    *angle1 = (180*(a1 + b1) / PI) - 135;
+    *angle2 = 135 - (180*(a2 + b2) / PI);
 }
 
 int main(int argc, char* argv[]) {
