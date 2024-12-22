@@ -93,17 +93,8 @@ void app_main()
 {
     init_uart();
 
-    esp_err_t ret = init_legs(&left_leg, &right_leg);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to init legs: %s", esp_err_to_name(ret));
-        return;
-    }
-
-    right_x = REAR_OFFSET/2;
-    right_y = 20;
-    left_x = REAR_OFFSET/2;
-    left_y = 20;
-
+    init_legs(&left_leg, &right_leg);
+    
     xTaskCreate(rx_task, "uart_rx_task", 1024 * 2, NULL, 10, NULL);
     // xTaskCreate(uart_task, "uart_task", 2048, NULL, 10, NULL);
     ESP_LOGI("SYSTEM", "uart receive task started");
