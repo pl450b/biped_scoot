@@ -1,2 +1,4 @@
 build/*
 main/secrets.h
+managaed_components/*
+

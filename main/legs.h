@@ -1,3 +1,6 @@
+#ifndef LEGS_H
+#define LEGS_H
+
 #include "driver/mcpwm_prelude.h"
 
 typedef struct {
@@ -18,18 +21,27 @@ typedef struct {
     servo_config_t front_servo;
     servo_config_t rear_servo;
     mcpwm_timer_handle_t timer;
-    bool left_leg;
 } leg_t;
 
-static inline uint32_t angle_to_compare(int angle);
+class LegSystem {
+private:
+    leg_t left_leg, right_leg;
 
-void calc_angle(int x, int y, int *front_angle, int *rear_angle);
+    esp_err_t init_servo(servo_config_t *servo, mcpwm_timer_handle_t *timer, int gpio_num,
+               int clock_group);
 
-esp_err_t init_servo(servo_config_t *servo, mcpwm_timer_handle_t *timer, int gpio_num, int clock_group);
+    static inline uint32_t angle_to_compare(int angle);
 
-esp_err_t init_legs(leg_t* left_leg, leg_t* right_leg);
+    int calc_angle(int x, int y, int *front_angle, int *rear_angle);
 
-// Function to set servo angle
-esp_err_t set_servo_angle(servo_config_t *servo, int angle);
+    
+public:
+    
+    LegSystem();
+    
+    esp_err_t set_leg_pos(bool left_leg, int x, int y);
 
-esp_err_t set_leg_pos(leg_t* leg, int x, int y);
+    esp_err_t set_servo_angle(int leg, int angle);
+};
+
+#endif
