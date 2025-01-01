@@ -46,4 +46,6 @@ void app_main()
     ESP_LOGI("SYSTEM", "Init UART complete");
     task_initI2C();
     ESP_LOGI("SYSTEM", "Init i2c with MPU6050 complete");
+
+    // xTaskCreate(tcp_server_task, "tcp_server", 4096, 5, NULL);
 }
