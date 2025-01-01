@@ -30,7 +30,7 @@ private:
     esp_err_t init_servo(servo_config_t *servo, mcpwm_timer_handle_t *timer, int gpio_num,
                int clock_group);
 
-    static inline uint32_t angle_to_compare(int angle);
+    inline uint32_t angle_to_compare(int angle);
 
     int calc_angle(int x, int y, int *front_angle, int *rear_angle);
 

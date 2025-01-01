@@ -29,7 +29,7 @@ static const char *LEG_TAG   = "Leg System";
 #define SERVO_TIMEBASE_PERIOD        20000    // 20000 ticks, 20ms
 
 
-static inline uint32_t LegSystem::angle_to_compare(int angle)
+inline uint32_t LegSystem::angle_to_compare(int angle)
 {
     return (angle - SERVO_MIN_DEGREE) * (SERVO_MAX_PULSEWIDTH_US - SERVO_MIN_PULSEWIDTH_US) / (SERVO_MAX_DEGREE - SERVO_MIN_DEGREE) + SERVO_MIN_PULSEWIDTH_US;
 }
@@ -61,23 +61,19 @@ int LegSystem::calc_angle(int x, int y, int *front_angle, int *rear_angle) {
 
 esp_err_t LegSystem::init_servo(servo_config_t *servo, mcpwm_timer_handle_t *timer, int gpio_num, int clock_group) {
     servo->oper = NULL;
-    servo->oper_config = (mcpwm_operator_config_t) {
-        .group_id = clock_group, // operator must be in the same group to the timer
-    };
+    servo->oper_config.group_id = clock_group; // operator must be in the same group to the timer
 
     ESP_LOGI(SERVO_TAG, "Connect timer and operator");
     ESP_ERROR_CHECK(mcpwm_new_operator(&servo->oper_config, &servo->oper));
     ESP_ERROR_CHECK(mcpwm_operator_connect_timer(servo->oper, *timer));
 
     ESP_LOGI(SERVO_TAG, "Create comparator and generator from the operator");
-    servo->comparator_config = (mcpwm_comparator_config_t) {
-        .flags.update_cmp_on_tez = true,
-    };
+    servo->comparator_config.flags.update_cmp_on_tez = true;
+
     ESP_ERROR_CHECK(mcpwm_new_comparator(servo->oper, &servo->comparator_config, 
                                          &servo->comparator));
-    servo->generator_config = (mcpwm_generator_config_t) {
-        .gen_gpio_num = gpio_num,
-    };
+    servo->generator_config.gen_gpio_num = gpio_num;
+
     ESP_ERROR_CHECK(mcpwm_new_generator(servo->oper, &servo->generator_config, 
                                         &servo->generator));
 
@@ -94,7 +90,7 @@ esp_err_t LegSystem::init_servo(servo_config_t *servo, mcpwm_timer_handle_t *tim
     return ESP_OK;
 }
 
-esp_err_t LegSystem::LegSystem() {
+LegSystem::LegSystem() {
     // Set internal leg identifies (for angle calculation)
     // Setup Timers
     left_leg.timer = NULL;
@@ -103,15 +99,15 @@ esp_err_t LegSystem::LegSystem() {
         .group_id = 0,
         .clk_src = MCPWM_TIMER_CLK_SRC_DEFAULT,
         .resolution_hz = SERVO_TIMEBASE_RESOLUTION_HZ,
-        .period_ticks = SERVO_TIMEBASE_PERIOD,
         .count_mode = MCPWM_TIMER_COUNT_MODE_UP,
+        .period_ticks = SERVO_TIMEBASE_PERIOD,
     };
     mcpwm_timer_config_t timer_right_config = {
         .group_id = 1,
         .clk_src = MCPWM_TIMER_CLK_SRC_DEFAULT,
         .resolution_hz = SERVO_TIMEBASE_RESOLUTION_HZ,
-        .period_ticks = SERVO_TIMEBASE_PERIOD,
         .count_mode = MCPWM_TIMER_COUNT_MODE_UP,
+        .period_ticks = SERVO_TIMEBASE_PERIOD,
     };
     ESP_ERROR_CHECK(mcpwm_new_timer(&timer_left_config, &left_leg.timer));
     ESP_ERROR_CHECK(mcpwm_new_timer(&timer_right_config, &right_leg.timer));
@@ -174,11 +170,11 @@ esp_err_t LegSystem::set_servo_angle(int leg, int angle) { // servo_config_t *se
     return ESP_OK;
 }
 
-esp_err_t LegSystem::set_leg_pos(bool left_leg, int x, int y) {
+esp_err_t LegSystem::set_leg_pos(bool is_left_leg, int x, int y) {
     int front_angle, rear_angle;
     calc_angle(x, y, &front_angle, &rear_angle);
 
-    if(left_leg) {
+    if(is_left_leg) {
         front_angle = front_angle - left_leg.front_servo.angle_offset;
         rear_angle = left_leg.rear_servo.angle_offset - rear_angle;
         set_servo_angle(1, front_angle);

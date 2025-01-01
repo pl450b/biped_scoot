@@ -6,6 +6,7 @@
 #include "math.h"
 
 #include "secrets.h"
+#include "mpu6050_types.h"
 
 #include "esp_system.h"
 #include "esp_wifi.h"
@@ -30,6 +31,9 @@
 // leg_t left_leg, right_leg;
 
 extern void init_uart();
+extern void task_initI2C();
+
+QueueHandle_t mpuQueue;
 
 extern "C" {
 	void app_main(void);
@@ -37,6 +41,9 @@ extern "C" {
 
 void app_main()
 {
+    mpuQueue = xQueueCreate(1, sizeof(mpu_data_t));
     init_uart();
-    ESP_LOGI("TEST", "This is a test from Wes");
+    ESP_LOGI("SYSTEM", "Init UART complete");
+    task_initI2C();
+    ESP_LOGI("SYSTEM", "Init i2c with MPU6050 complete");
 }
