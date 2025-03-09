@@ -8,6 +8,11 @@
 #define UPPER_LEG_LEN   24
 #define PI              3.14159
 
+typedef struct {
+    int id;
+    int value;
+    char letter;
+} fun_data_t;
 
 void calc_leg_angles(int x, int y, int* angle1, int* angle2) {
     double front_angle, rear_angle;
@@ -41,6 +46,13 @@ int main(int argc, char* argv[]) {
     calc_leg_angles(x ,y, &theta1, &theta2);
     
     printf("theta1 = %d, theta2 = %d\n", theta1, theta2);
+    
+    fun_data_t fun_data;
+    fun_data.id = 6;
+    fun_data.value = 55;
+    fun_data.letter = 'a';
 
+    printf("I think this should be an addy: %i\n", fun_data);
+    
     return 0;
 }
