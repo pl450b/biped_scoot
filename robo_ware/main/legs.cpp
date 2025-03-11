@@ -160,7 +160,7 @@ esp_err_t LegSystem::set_servo_angle(int leg, int angle) { // servo_config_t *se
         case(2): servo = &right_leg.rear_servo; break;
         case(3): servo = &left_leg.front_servo; break;
         case(4): servo = &left_leg.rear_servo; break;
-        default: servo = NULL; break;
+        default: servo = NULL; break; // TODO: Invalid leg input
   }
     if (angle < SERVO_MIN_DEGREE || angle > SERVO_MAX_DEGREE) {
         return ESP_ERR_INVALID_ARG;

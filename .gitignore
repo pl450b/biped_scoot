@@ -1,4 +1,4 @@
-build/*
-main/secrets.h
-managaed_components/*
-
+robo_ware/build
+robo_ware/main/secrets.h
+robo_ware/managaed_components
+leg_simulation/venv

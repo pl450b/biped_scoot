@@ -35,8 +35,8 @@ QueueHandle_t rxQueue;
 
 void app_main()
 {
-    rxQueue = xQueueCreate(1, sizeof(rx_data_t));
-    txQueue = xQueueCreate(1, sizeof(tx_data_t));
+    rxQueue = xQueueCreate(1, sizeof(char[256]));
+    txQueue = xQueueCreate(1, sizeof(char[256]));
     
     init_uart();
     ESP_LOGI("SYSTEM", "Init UART complete");
