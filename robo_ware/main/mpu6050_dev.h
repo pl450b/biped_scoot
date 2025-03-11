@@ -8,4 +8,10 @@ typedef struct {
     float rot_acc_x, rot_acc_y, rot_acc_z;          // Raw gyro
 } mpu_data_t;
 
-#endif
+void init_I2C(void);
+
+void task_display(void* pvParameters);
+
+void task_mpu_to_queue(void* pvParameters)
+
+#endif // MPU_H

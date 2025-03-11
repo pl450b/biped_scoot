@@ -22,8 +22,8 @@
 #include "wifi.h"
 
 /* AP Configuration */  
-#define WIFI_AP_SSID                "WesleyMiniNetwork"
-#define WIFI_AP_PASSWD              "WesleyMiniNetwork"
+#define WIFI_AP_SSID                "WilmaTheWalrus"
+#define WIFI_AP_PASSWD              "p12000929"
 #define WIFI_CHANNEL                 6
 #define MAX_STA_CONN                 18
 #define PORT                         3333                    // TCP port number for the server
@@ -201,6 +201,7 @@ void tcp_server_task(void *pvParameters)
                     xTaskCreate(tcp_tx_task, "tcp_tx_task", 2048, (void*)sock, 5, &txHandle);
                     xTaskCreate(tcp_rx_task, "tcp_rx_task", 2048, (void*)sock, 5, &rxHandle);
                     rxtx_tasks = true;
+                    ESP_LOGI(TAG, "TCP rx/tx tasks started!");
                 }
                 vTaskDelay(pdMS_TO_TICKS(5000));
             }
@@ -233,11 +234,14 @@ void tcp_rx_task(void* pvParameters) {
     char msg_buffer[256];
     while(1) {
         int received = recv(sock, msg_buffer, sizeof(msg_buffer)-1, 0);
-        BaseType_t que_err = xQueueSend(rxQueue, &msg_buffer, (TickType_t)0); // TODO: add catch for queue failure
         if(received < 0) {
             ESP_LOGE(TAG, "Error occurred during sending over socket: errno %d", errno);
             c_sock_connected = false;
             vTaskDelete(NULL);
+        }
+        BaseType_t que_err = xQueueSend(rxQueue, &msg_buffer, (TickType_t)0); // TODO: add catch for queue failure
+        if(que_err != pdPASS) {
+            ESP_LOGE(TAG, "Push to queue failed with error: %i", que_err);
         }
         vTaskDelay(pdMS_TO_TICKS(100));
     }
