@@ -23,25 +23,18 @@ typedef struct {
     mcpwm_timer_handle_t timer;
 } leg_t;
 
-class LegSystem {
-private:
-    leg_t left_leg, right_leg;
-
-    esp_err_t init_servo(servo_config_t *servo, mcpwm_timer_handle_t *timer, int gpio_num,
-               int clock_group);
-
-    inline uint32_t angle_to_compare(int angle);
-
-    int calc_angle(int x, int y, int *front_angle, int *rear_angle);
-
-    
-public:
-    
-    LegSystem();
-    
-    esp_err_t set_leg_pos(bool left_leg, int x, int y);
-
-    esp_err_t set_servo_angle(int leg, int angle);
-};
-
+#ifdef __cplusplus
+extern "C" {
 #endif
+
+esp_err_t init_servo(servo_config_t *servo, mcpwm_timer_handle_t *timer, int gpio_num, int clock_group);
+
+esp_err_t init_leg(leg_t* leg, int gpio_pin1, int gpio_pin2, int clock_group);
+
+esp_err_t set_servo_angle(leg_t* leg, bool front_servo, int angle);
+
+#ifdef __cplusplus
+}
+#endif // __cplusplus
+
+#endif // LEGS_H
