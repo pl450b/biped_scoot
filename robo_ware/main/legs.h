@@ -27,6 +27,8 @@ typedef struct {
 extern "C" {
 #endif
 
+inline uint32_t angle_to_compare(int angle);
+
 esp_err_t init_servo(servo_config_t *servo, mcpwm_timer_handle_t *timer, int gpio_num, int clock_group);
 
 esp_err_t init_leg(leg_t* leg, int gpio_pin1, int gpio_pin2, int clock_group);

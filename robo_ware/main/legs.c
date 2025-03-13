@@ -91,7 +91,7 @@ esp_err_t init_leg(leg_t* leg, int gpio_pin1, int gpio_pin2, int clock_group) {
 }
 
 esp_err_t set_servo_angle(leg_t* leg, bool front_servo, int angle) {
-    servo_config_t *servo;
+    servo_config_t *servo = NULL;
     if(front_servo) {
         servo = &leg->front_servo;
     } else {

@@ -7,7 +7,7 @@
  *  Edited by Wesley on: 29.12.2024
  *      Added task_mpu_producer
  */
-#include <driver/i2c.h>
+#include <driver/i2c_master.h>
 #include <esp_log.h>
 #include <esp_err.h>
 #include <freertos/FreeRTOS.h>
@@ -16,7 +16,7 @@
 #include "MPU6050_6Axis_MotionApps20.h"
 #include "sdkconfig.h"
 
-#include "mpu6050_types.h"
+#include "mpu6050_dev.h"
 
 #define PIN_SDA 21
 #define PIN_CLK 22
@@ -34,7 +34,7 @@ uint16_t fifoCount;     // count of all bytes currently in FIFO
 uint8_t fifoBuffer[64]; // FIFO storage buffer
 uint8_t mpuIntStatus;   // holds actual interrupt status byte from MPU
 
-void task_initI2C(void) {
+void init_I2C(void) {
 	i2c_config_t conf;
 	conf.mode = I2C_MODE_MASTER;
 	conf.sda_io_num = (gpio_num_t)PIN_SDA;
@@ -47,7 +47,7 @@ void task_initI2C(void) {
 	vTaskDelete(NULL);
 }
 
-void task_display(void*){
+void task_display(void *pvParameters) {
 	MPU6050 mpu = MPU6050();
 	mpu.initialize();
 	mpu.dmpInitialize();
