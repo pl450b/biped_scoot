@@ -74,7 +74,6 @@ void app_main()
             set_servo_angle(&right_leg, false, servo_angles[3]);
 
             memset(msg_buffer, 0, sizeof(msg_buffer));
-            vTaskDelay(pdMS_TO_TICKS(10));
         }
     }
 

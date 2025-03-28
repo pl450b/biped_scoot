@@ -22,8 +22,8 @@
 #include "wifi.h"
 
 /* AP Configuration */  
-#define WIFI_AP_SSID                "WilmaTheWalrus"
-#define WIFI_AP_PASSWD              "p12000929"
+#define WIFI_AP_SSID                "Tar Badger"
+#define WIFI_AP_PASSWD              "!uwunc2005"
 #define WIFI_CHANNEL                 6
 #define MAX_STA_CONN                 18
 #define PORT                         3333                    // TCP port number for the server
