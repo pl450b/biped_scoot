@@ -1,1 +1,0 @@
-*Bipedal Scooting Robot*

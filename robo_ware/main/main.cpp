@@ -5,7 +5,7 @@
 #include "driver/uart.h"
 #include "math.h"
 
-#include "secrets.h"
+// #include "secrets.h" TODO: implement this
 
 #include "esp_system.h"
 #include "esp_wifi.h"
@@ -19,7 +19,6 @@
 
 #include "legs.h"
 #include "wifi.h"
-#include "mpu6050_dev.h"
 
 // #define SERVO_TIMEBASE_RESOLUTION_HZ 1000000  // 1MHz, 1us per tick
 // #define SERVO_TIMEBASE_PERIOD        20000    // 20000 ticks, 20ms
@@ -37,9 +36,9 @@ void app_main()
 {
     rxQueue = xQueueCreate(1, sizeof(char[256]));
     txQueue = xQueueCreate(1, sizeof(char[256]));
-    
-    init_I2C();
-    ESP_LOGI("SYSTEM", "Init i2c with MPU6050 complete");
+
+    wifi_init_sta();
+    ESP_LOGI("SYSTEM", "Wifi init complete");
     LegSystem legs;
     ESP_LOGI("SYSTEM", "Init legs complete");
     // xTaskCreate(tcp_server_task, "tcp_server", 4096, 5, NULL);
