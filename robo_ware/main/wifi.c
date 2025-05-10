@@ -1,4 +1,3 @@
-#include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
@@ -12,9 +11,6 @@
 #include "lwip/inet.h"
 #include "lwip/netdb.h"
 #include "lwip/sockets.h"
-#if IP_NAPT
-#include "lwip/lwip_napt.h"
-#endif
 #include "lwip/err.h"
 #include "lwip/sys.h"
 #include "driver/gpio.h"
@@ -31,6 +27,7 @@
 #define KEEPALIVE_INTERVAL           10
 #define KEEPALIVE_COUNT              5
 #define WIFI_RETRY_COUNT            10  // After 10 connect attemps, unit resets
+#define ROBO_PASS                   "12345"
 /* The event group allows multiple bits for each event, but we only care about two events:
  * - we are connected to the AP with an IP
  * - we failed to connect after the maximum amount of retries */
@@ -41,8 +38,8 @@ extern QueueHandle_t txQueue;
 extern QueueHandle_t rxQueue;
 
 static const char *TAG = "WIFI";
-static TaskHandle_t rxHandle = NULL;
-static TaskHandle_t txHandle = NULL;
+static TaskHandle_t upd_Handle = NULL;
+
 
 /* FreeRTOS event group to signal when we are connected/disconnected */
 static EventGroupHandle_t s_wifi_event_group;
@@ -116,6 +113,58 @@ void wifi_init_sta(void)
     }
 }
 
+static const char *payload = "Crazzzyyyy Message!!!!";
+static void udp_client_task(void *pvParameters)
+{
+    int addr_family = 0;
+    int ip_protocol = 0;
+    char ip_addr_str[128];
+
+    strcpy(ip_addr_str, (char*)pvParameters);   //Copy passed IP in case another socket is opened
+
+    while (1) {
+        struct sockaddr_in dest_addr;
+        dest_addr.sin_addr.s_addr = inet_addr(ip_addr_str);
+        dest_addr.sin_family = AF_INET;
+        dest_addr.sin_port = htons(PORT);
+        addr_family = AF_INET;
+        ip_protocol = IPPROTO_IP;
+
+        int sock = socket(addr_family, SOCK_DGRAM, ip_protocol);
+        if (sock < 0) {
+            ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
+            break;
+        }
+
+        // Set timeout
+        struct timeval timeout;
+        timeout.tv_sec = 10;
+        timeout.tv_usec = 0;
+        setsockopt (sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout);
+
+        ESP_LOGI(TAG, "Socket created, sending to %s:%d", ip_addr_str, PORT);
+
+        while (sock != -1) {
+
+            int err = sendto(sock, payload, strlen(payload), 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
+            if (err < 0) {
+                ESP_LOGE(TAG, "Error occurred during sending: errno %d", errno);
+                break;
+            }
+            ESP_LOGI(TAG, "Message sent");
+
+
+            vTaskDelay(10 / portTICK_PERIOD_MS);
+        }
+
+        ESP_LOGE(TAG, "Shutting down socket and retrying...");
+        shutdown(sock, 0);
+        close(sock);
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+    vTaskDelete(NULL);
+}
+
 void tcp_server_task(void *pvParameters)
 {
     char addr_str[128];
@@ -126,6 +175,8 @@ void tcp_server_task(void *pvParameters)
     int keepInterval = KEEPALIVE_INTERVAL;
     int keepCount = KEEPALIVE_COUNT;
     struct sockaddr_storage dest_addr;
+
+    char msg_buffer[128];
 
     struct sockaddr_in *dest_addr_ip4 = (struct sockaddr_in *)&dest_addr;
     dest_addr_ip4->sin_addr.s_addr = htonl(INADDR_ANY);
@@ -184,52 +235,39 @@ void tcp_server_task(void *pvParameters)
         ESP_LOGI(TAG, "Socket accepted ip address: %s", addr_str);
 
         // TODO: put functions here
+        strcpy(msg_buffer, "Enter passwd: ");
+        send(sock, msg_buffer, strlen(msg_buffer), 0);
 
-        shutdown(sock, 0);
-        close(sock);
+        int received = recv(sock, msg_buffer, strlen(msg_buffer), 0);
+        msg_buffer[received-1] = '\0'; 
+
+        if(strcmp(msg_buffer, ROBO_PASS) == 0) {
+            strcpy(msg_buffer, "Password corret, you may now send commands\n");
+            send(sock, msg_buffer, strlen(msg_buffer), 0);
+
+            xTaskCreate(udp_client_task, "udp_socket", 4096, addr_str, 5, &upd_Handle);
+            
+            while(1) {
+                vTaskDelay(pdMS_TO_TICKS(500));
+                received = recv(sock, msg_buffer, sizeof(msg_buffer), MSG_DONTWAIT);
+                    if (received == 0) {
+                        ESP_LOGI(TAG, "Client disconnected.");
+                        vTaskDelete(upd_Handle);
+                        shutdown(sock, 0);
+                        close(sock);
+                        break;
+                    }
+            }
+        } else{ 
+            ESP_LOGE(TAG, "Wrong password, got %s", msg_buffer);
+            strcpy(msg_buffer, "Wrong password, goodbye");
+            send(sock, msg_buffer, strlen(msg_buffer), 0);
+            shutdown(sock, 0);
+            close(sock);
+        }        
     }
 
 CLEAN_UP:
     close(listen_sock);
     vTaskDelete(NULL);
 }
-
-// void tcp_tx_task(void* pvParameters) {
-//     int sock = (int)pvParameters;
-//     char msg_buffer[100];
-//     while(1) {
-//         if(xQueueReceive(txQueue, &msg_buffer, (TickType_t)0) != pdPASS) {
-//             vTaskDelay(pdMS_TO_TICKS(300));
-//             continue;
-//         }
-//         int written = send(sock, msg_buffer, sizeof(msg_buffer)-1, 0);
-//         if(written < 0) {
-//             ESP_LOGE(TAG, "Error occurred during sending over socket: errno %d", errno);
-//             c_sock_connected = false;
-//             vTaskDelete(NULL);
-//         }
-//         memset(msg_buffer, 0, sizeof(msg_buffer));
-//         vTaskDelay(pdMS_TO_TICKS(100));
-//     }
-// }
-
-// void tcp_rx_task(void* pvParameters) {
-//     int sock = (int)pvParameters;
-//     char msg_buffer[100];
-//     while(1) {
-//         int received = recv(sock, msg_buffer, sizeof(msg_buffer)-1, 0);
-//         if(received < 0) {
-//             ESP_LOGE(TAG, "Error occurred during sending over socket: errno %d", errno);
-//             c_sock_connected = false;
-//             vTaskDelete(NULL);
-//         }
-//         BaseType_t que_err = xQueueSend(rxQueue, &msg_buffer, (TickType_t)0);
-//         if(que_err != pdPASS) {
-//             ESP_LOGE(TAG, "Push to queue failed with error: %i", que_err);
-//         } else {
-//             ESP_LOGI(TAG, "Received and pushed: %s", msg_buffer);    
-//         }
-//         memset(msg_buffer, 0, sizeof(msg_buffer));
-//         // vTaskDelay(pdMS_TO_TICKS(100));
-//     }
-// }
