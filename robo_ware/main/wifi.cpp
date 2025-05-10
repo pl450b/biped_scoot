@@ -22,8 +22,8 @@
 #include "wifi.h"
 
 /* AP Configuration */  
-#define WIFI_AP_SSID                "Tar Badger"
-#define WIFI_AP_PASSWD              "!uwunc2005"
+#define WIFI_AP_SSID                "WesleyNetwork"
+#define WIFI_AP_PASSWD              "WesleyNetwork5"
 #define WIFI_CHANNEL                 6
 #define MAX_STA_CONN                 18
 #define PORT                         3333                    // TCP port number for the server
@@ -43,9 +43,6 @@ extern QueueHandle_t rxQueue;
 static const char *TAG = "WIFI";
 static TaskHandle_t rxHandle = NULL;
 static TaskHandle_t txHandle = NULL;
-static bool wifi_connected = false;
-static bool l_sock_connected = false;
-static bool c_sock_connected = false;
 
 /* FreeRTOS event group to signal when we are connected/disconnected */
 static EventGroupHandle_t s_wifi_event_group;
@@ -58,8 +55,6 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
         esp_wifi_connect();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) { 
         if (s_retry_num < WIFI_RETRY_COUNT) {
-            wifi_connected = false;
-            c_sock_connected = false;
             esp_wifi_connect();
             s_retry_num++;
             ESP_LOGI(TAG, "retry to connect to the AP");
@@ -73,7 +68,6 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
         ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
         s_retry_num = 0;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
-        wifi_connected = true;
     }
 }
 
@@ -122,14 +116,12 @@ void wifi_init_sta(void)
     }
 }
 
-
 void tcp_server_task(void *pvParameters)
 {
     char addr_str[128];
     int addr_family = AF_INET;
     int ip_protocol = 0;
     int keepAlive = 1;
-    double msg_buffer[4];
     int keepIdle = KEEPALIVE_IDLE;
     int keepInterval = KEEPALIVE_INTERVAL;
     int keepCount = KEEPALIVE_COUNT;
@@ -141,114 +133,103 @@ void tcp_server_task(void *pvParameters)
     dest_addr_ip4->sin_port = htons(PORT);
     ip_protocol = IPPROTO_IP;
 
-    while(wifi_connected) {
-        int listen_sock = socket(addr_family, SOCK_STREAM, ip_protocol);
-        if (listen_sock < 0) {
-            ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
-            c_sock_connected = false;
-            continue;
-        }
-        int opt = 1;
-        setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-
-        ESP_LOGI(TAG, "Socket created");
-
-        int err = bind(listen_sock, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
-        if (err != 0) {
-            ESP_LOGE(TAG, "Socket unable to bind: errno %d", errno);
-            ESP_LOGE(TAG, "IPPROTO: %d", addr_family);
-            close(listen_sock);
-            c_sock_connected = false;
-            continue;
-        }
-        ESP_LOGI(TAG, "Socket bound, port %d", PORT);
-
-        err = listen(listen_sock, 1);
-        if (err != 0) {
-            ESP_LOGE(TAG, "Error occurred during listen: errno %d", errno);
-            close(listen_sock);
-            c_sock_connected = false;
-            continue;
-        }
-        l_sock_connected = true;
-
-        while (wifi_connected && l_sock_connected) {
-            ESP_LOGI(TAG, "Socket listening");
-
-            struct sockaddr_storage source_addr; // Large enough for both IPv4 or IPv6
-            socklen_t addr_len = sizeof(source_addr);
-            int sock = accept(listen_sock, (struct sockaddr *)&source_addr, &addr_len);
-            if (sock < 0) {
-                ESP_LOGE(TAG, "Unable to accept connection: errno %d", errno);
-                c_sock_connected = false;
-                continue;
-            }
-
-            // Set tcp keepalive option
-            setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &keepAlive, sizeof(int));
-            setsockopt(sock, IPPROTO_TCP, TCP_KEEPIDLE, &keepIdle, sizeof(int));
-            setsockopt(sock, IPPROTO_TCP, TCP_KEEPINTVL, &keepInterval, sizeof(int));
-            setsockopt(sock, IPPROTO_TCP, TCP_KEEPCNT, &keepCount, sizeof(int));
-
-            ESP_LOGI(TAG, "Socket accepted!");
-            c_sock_connected = true;
-            
-            bool rxtx_tasks = false;
-            while(wifi_connected && l_sock_connected && c_sock_connected) {
-                if(!rxtx_tasks) {
-                    // start tasks that monitor tcp connection
-                    xTaskCreate(tcp_tx_task, "tcp_tx_task", 2048, (void*)sock, 5, &txHandle);
-                    xTaskCreate(tcp_rx_task, "tcp_rx_task", 2048, (void*)sock, 5, &rxHandle);
-                    rxtx_tasks = true;
-                    ESP_LOGI(TAG, "TCP rx/tx tasks started!");
-                }
-                vTaskDelay(pdMS_TO_TICKS(5000));
-            }
-            shutdown(sock, 0);
-            close(sock);
-            vTaskDelete(txHandle);
-            vTaskDelete(rxHandle);
-        }   // socket while loop
-    } // Main while connected
-    vTaskDelay(pdMS_TO_TICKS(500));
-}
-
-void tcp_tx_task(void* pvParameters) {
-    int sock = (int)pvParameters;
-    char msg_buffer[100];
-    while(1) {
-        if(xQueueReceive(txQueue, &msg_buffer, (TickType_t)0) != pdPASS) {
-            vTaskDelay(pdMS_TO_TICKS(300));
-            continue;
-        }
-        int written = send(sock, msg_buffer, sizeof(msg_buffer)-1, 0);
-        if(written < 0) {
-            ESP_LOGE(TAG, "Error occurred during sending over socket: errno %d", errno);
-            c_sock_connected = false;
-            vTaskDelete(NULL);
-        }
-        memset(msg_buffer, 0, sizeof(msg_buffer));
-        vTaskDelay(pdMS_TO_TICKS(100));
+    int listen_sock = socket(addr_family, SOCK_STREAM, ip_protocol);
+    if (listen_sock < 0) {
+        ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
+        vTaskDelete(NULL);
+        return;
     }
+    int opt = 1;
+    setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+    ESP_LOGI(TAG, "Socket created");
+
+    int err = bind(listen_sock, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
+    if (err != 0) {
+        ESP_LOGE(TAG, "Socket unable to bind: errno %d", errno);
+        ESP_LOGE(TAG, "IPPROTO: %d", addr_family);
+        goto CLEAN_UP;
+    }
+    ESP_LOGI(TAG, "Socket bound, port %d", PORT);
+
+    err = listen(listen_sock, 1);
+    if (err != 0) {
+        ESP_LOGE(TAG, "Error occurred during listen: errno %d", errno);
+        goto CLEAN_UP;
+    }
+
+    while (1) {
+
+        ESP_LOGI(TAG, "Socket listening");
+
+        struct sockaddr_storage source_addr; // Large enough for both IPv4 or IPv6
+        socklen_t addr_len = sizeof(source_addr);
+        int sock = accept(listen_sock, (struct sockaddr *)&source_addr, &addr_len);
+        if (sock < 0) {
+            ESP_LOGE(TAG, "Unable to accept connection: errno %d", errno);
+            break;
+        }
+
+        // Set tcp keepalive option
+        setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &keepAlive, sizeof(int));
+        setsockopt(sock, IPPROTO_TCP, TCP_KEEPIDLE, &keepIdle, sizeof(int));
+        setsockopt(sock, IPPROTO_TCP, TCP_KEEPINTVL, &keepInterval, sizeof(int));
+        setsockopt(sock, IPPROTO_TCP, TCP_KEEPCNT, &keepCount, sizeof(int));
+        // Convert ip address to string
+
+        if (source_addr.ss_family == PF_INET) {
+            inet_ntoa_r(((struct sockaddr_in *)&source_addr)->sin_addr, addr_str, sizeof(addr_str) - 1);
+        }
+
+        ESP_LOGI(TAG, "Socket accepted ip address: %s", addr_str);
+
+        // TODO: put functions here
+
+        shutdown(sock, 0);
+        close(sock);
+    }
+
+CLEAN_UP:
+    close(listen_sock);
+    vTaskDelete(NULL);
 }
 
-void tcp_rx_task(void* pvParameters) {
-    int sock = (int)pvParameters;
-    char msg_buffer[100];
-    while(1) {
-        int received = recv(sock, msg_buffer, sizeof(msg_buffer)-1, 0);
-        if(received < 0) {
-            ESP_LOGE(TAG, "Error occurred during sending over socket: errno %d", errno);
-            c_sock_connected = false;
-            vTaskDelete(NULL);
-        }
-        BaseType_t que_err = xQueueSend(rxQueue, &msg_buffer, (TickType_t)0);
-        if(que_err != pdPASS) {
-            ESP_LOGE(TAG, "Push to queue failed with error: %i", que_err);
-        } else {
-            ESP_LOGI(TAG, "Received and pushed: %s", msg_buffer);    
-        }
-        memset(msg_buffer, 0, sizeof(msg_buffer));
-        // vTaskDelay(pdMS_TO_TICKS(100));
-    }
-}
+// void tcp_tx_task(void* pvParameters) {
+//     int sock = (int)pvParameters;
+//     char msg_buffer[100];
+//     while(1) {
+//         if(xQueueReceive(txQueue, &msg_buffer, (TickType_t)0) != pdPASS) {
+//             vTaskDelay(pdMS_TO_TICKS(300));
+//             continue;
+//         }
+//         int written = send(sock, msg_buffer, sizeof(msg_buffer)-1, 0);
+//         if(written < 0) {
+//             ESP_LOGE(TAG, "Error occurred during sending over socket: errno %d", errno);
+//             c_sock_connected = false;
+//             vTaskDelete(NULL);
+//         }
+//         memset(msg_buffer, 0, sizeof(msg_buffer));
+//         vTaskDelay(pdMS_TO_TICKS(100));
+//     }
+// }
+
+// void tcp_rx_task(void* pvParameters) {
+//     int sock = (int)pvParameters;
+//     char msg_buffer[100];
+//     while(1) {
+//         int received = recv(sock, msg_buffer, sizeof(msg_buffer)-1, 0);
+//         if(received < 0) {
+//             ESP_LOGE(TAG, "Error occurred during sending over socket: errno %d", errno);
+//             c_sock_connected = false;
+//             vTaskDelete(NULL);
+//         }
+//         BaseType_t que_err = xQueueSend(rxQueue, &msg_buffer, (TickType_t)0);
+//         if(que_err != pdPASS) {
+//             ESP_LOGE(TAG, "Push to queue failed with error: %i", que_err);
+//         } else {
+//             ESP_LOGI(TAG, "Received and pushed: %s", msg_buffer);    
+//         }
+//         memset(msg_buffer, 0, sizeof(msg_buffer));
+//         // vTaskDelay(pdMS_TO_TICKS(100));
+//     }
+// }

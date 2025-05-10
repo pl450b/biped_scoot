@@ -1,2 +1,2 @@
-idf_component_register(SRCS "mpu6050_dev.cpp" "main.cpp" "legs.c" "wifi.cpp"
+idf_component_register(SRCS "legs.c" "wifi.cpp" "main.cpp"
                     INCLUDE_DIRS ".")

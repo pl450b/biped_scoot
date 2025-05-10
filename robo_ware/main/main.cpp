@@ -21,7 +21,6 @@
 #include "secrets.h"
 #include "legs.h"
 #include "wifi.h"
-#include "mpu6050_dev.h"
 
 #define FRONT_LEFT_SERVO             32
 #define BACK_LEFT_SERVO              33 
