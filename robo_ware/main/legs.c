@@ -5,6 +5,7 @@
 #include "math.h"
 
 #include "legs.h"
+#include <string.h>
 
 // Please consult the datasheet of your servo before changing the following parameters
 #define SERVO_MIN_PULSEWIDTH_US 500  // Minimum pulse width in microsecond
@@ -28,42 +29,39 @@ inline uint32_t angle_to_compare(int angle)
     return (angle - SERVO_MIN_DEGREE) * (SERVO_MAX_PULSEWIDTH_US - SERVO_MIN_PULSEWIDTH_US) / (SERVO_MAX_DEGREE - SERVO_MIN_DEGREE) + SERVO_MIN_PULSEWIDTH_US;
 }
 
-esp_err_t init_servo(servo_config_t *servo, mcpwm_timer_handle_t *timer, int gpio_num, int clock_group) {
-    //servo->oper = NULL;
-    servo->oper_config.group_id = clock_group; // operator must be in the same group to the timer
-    servo->oper = NULL;
-    ESP_LOGI(SERVO_TAG, "Connect timer and operator");
-    ESP_ERROR_CHECK(mcpwm_new_operator(&servo->oper_config, &servo->oper));
-    ESP_ERROR_CHECK(mcpwm_operator_connect_timer(servo->oper, *timer));
+esp_err_t init_servo(servo_config_t *servo, mcpwm_oper_handle_t oper, int gpio_num) {
+    esp_err_t ret;
 
-    ESP_LOGI(SERVO_TAG, "Create comparator and generator from the operator");
+    memset(&servo->comparator_config, 0, sizeof(servo->comparator_config));
     servo->comparator_config.flags.update_cmp_on_tez = true;
+    ret = mcpwm_new_comparator(oper, &servo->comparator_config, &servo->comparator);
+    if (ret != ESP_OK) return ret;
 
-    servo->comparator = NULL;
-    ESP_LOGI(SERVO_TAG, "Initializing operator: group_id=%d, intr_priority=%d", 
-                servo->oper_config.group_id, servo->oper_config.intr_priority);
-    ESP_ERROR_CHECK(mcpwm_new_comparator(servo->oper, &servo->comparator_config, &servo->comparator));
+    memset(&servo->generator_config, 0, sizeof(servo->generator_config));
     servo->generator_config.gen_gpio_num = gpio_num;
+    ret = mcpwm_new_generator(oper, &servo->generator_config, &servo->generator);
+    if (ret != ESP_OK) return ret;
 
-    servo->generator = NULL;
-    ESP_ERROR_CHECK(mcpwm_new_generator(servo->oper, &servo->generator_config, 
-                                        &servo->generator));
+    ret = mcpwm_comparator_set_compare_value(servo->comparator, angle_to_compare(0));
+    if (ret != ESP_OK) return ret;
 
-    // set the initial compare value, so that the servo will spin to the center position
-    ESP_ERROR_CHECK(mcpwm_comparator_set_compare_value(servo->comparator, angle_to_compare(0)));
+    ret = mcpwm_generator_set_action_on_timer_event(
+        servo->generator,
+        MCPWM_GEN_TIMER_EVENT_ACTION(MCPWM_TIMER_DIRECTION_UP, MCPWM_TIMER_EVENT_EMPTY, MCPWM_GEN_ACTION_HIGH));
+    if (ret != ESP_OK) return ret;
 
-    ESP_LOGI(SERVO_TAG, "Set generator action on timer and compare event");
-    // go high on counter empty
-    ESP_ERROR_CHECK(mcpwm_generator_set_action_on_timer_event(servo->generator,
-                                                              MCPWM_GEN_TIMER_EVENT_ACTION(MCPWM_TIMER_DIRECTION_UP, MCPWM_TIMER_EVENT_EMPTY, MCPWM_GEN_ACTION_HIGH)));
-    // go low on compare threshold
-    ESP_ERROR_CHECK(mcpwm_generator_set_action_on_compare_event(servo->generator,
-                                                                MCPWM_GEN_COMPARE_EVENT_ACTION(MCPWM_TIMER_DIRECTION_UP, servo->comparator, MCPWM_GEN_ACTION_LOW)));
+    ret = mcpwm_generator_set_action_on_compare_event(
+        servo->generator,
+        MCPWM_GEN_COMPARE_EVENT_ACTION(MCPWM_TIMER_DIRECTION_UP, servo->comparator, MCPWM_GEN_ACTION_LOW));
+    if (ret != ESP_OK) return ret;
+
     return ESP_OK;
 }
 
-esp_err_t init_leg(leg_t* leg, int gpio_pin1, int gpio_pin2, int clock_group) {
-    // Setup Timer
+
+esp_err_t init_leg(leg_t* leg, int gpio_pin_a, int gpio_pin_b, int clock_group) {
+    esp_err_t ret;
+
     mcpwm_timer_config_t timer_config = {
         .group_id = clock_group,
         .clk_src = MCPWM_TIMER_CLK_SRC_DEFAULT,
@@ -71,36 +69,48 @@ esp_err_t init_leg(leg_t* leg, int gpio_pin1, int gpio_pin2, int clock_group) {
         .count_mode = MCPWM_TIMER_COUNT_MODE_UP,
         .period_ticks = SERVO_TIMEBASE_PERIOD,
     };
-    leg->timer = NULL;
-    ESP_ERROR_CHECK(mcpwm_new_timer(&timer_config, &leg->timer));
+    ret = mcpwm_new_timer(&timer_config, &leg->timer);
+    if (ret != ESP_OK) return ret;
 
-    esp_err_t ret = init_servo(&leg->front_servo, &leg->timer, gpio_pin1, clock_group);
-    if (ret != ESP_OK) {
-        ESP_LOGE(LEG_TAG, "Failed to init servo on pin %i with err %s", gpio_pin1, esp_err_to_name(ret));
-    }
+    leg->oper_config.group_id = clock_group;
+    ret = mcpwm_new_operator(&leg->oper_config, &leg->oper);
+    if (ret != ESP_OK) return ret;
 
-    ret = init_servo(&leg->rear_servo, &leg->timer, gpio_pin2, clock_group);
-    if (ret != ESP_OK) {
-        ESP_LOGE(LEG_TAG, "Failed to init servo on pin %i with err %s", gpio_pin2, esp_err_to_name(ret));
-    }
+    ret = mcpwm_operator_connect_timer(leg->oper, leg->timer);
+    if (ret != ESP_OK) return ret;
 
-    ESP_LOGI(LEG_TAG, "Enable and start timer");
-    ESP_ERROR_CHECK(mcpwm_timer_enable(leg->timer));
-    ESP_ERROR_CHECK(mcpwm_timer_start_stop(leg->timer, MCPWM_TIMER_START_NO_STOP));
+    ret = mcpwm_timer_enable(leg->timer);
+    if (ret != ESP_OK) return ret;
+
+    ret = mcpwm_timer_start_stop(leg->timer, MCPWM_TIMER_START_NO_STOP);
+    if (ret != ESP_OK) return ret;
+
+    ret = init_servo(&leg->front_servo, leg->oper, gpio_pin_a);
+    if (ret != ESP_OK) return ret;
+
+    ret = init_servo(&leg->rear_servo, leg->oper, gpio_pin_b);
+    if (ret != ESP_OK) return ret;
+
     return ESP_OK;
 }
 
-esp_err_t set_servo_angle(leg_t* leg, bool front_servo, int angle) {
-    servo_config_t *servo = NULL;
-    if(front_servo) {
-        servo = &leg->front_servo;
-    } else {
-        servo = &leg->rear_servo;
+
+esp_err_t set_servo_angle(servo_config_t* servo, int angle) {
+    if (servo == NULL || servo->comparator == NULL) {
+        ESP_LOGE("SERVO", "Invalid servo handle or comparator is NULL!");
+        return ESP_FAIL;
     }
+
+    ESP_LOGI(SERVO_TAG, "Servo and comparator exist");
+
     if (angle < SERVO_MIN_DEGREE || angle > SERVO_MAX_DEGREE) {
+        ESP_LOGW("SERVO", "Angle %d out of bounds", angle);
         return ESP_ERR_INVALID_ARG;
     }
+
+    ESP_LOGI(SERVO_TAG, "Angle good");
+
     servo->current_angle = angle;
-    return mcpwm_comparator_set_compare_value(servo->comparator, angle_to_compare(angle));
+    ESP_ERROR_CHECK(mcpwm_comparator_set_compare_value(servo->comparator, angle_to_compare(angle)));
     return ESP_OK;
 }

@@ -43,46 +43,49 @@ void app_main()
     ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(esp_netif_init());
 
-    rxQueue = xQueueCreate(100, sizeof(char[100]));
-    txQueue = xQueueCreate(100, sizeof(char[100]));
+    rxQueue = xQueueCreate(100, sizeof(char[128]));
+    txQueue = xQueueCreate(100, sizeof(char[128]));
     
     // init_I2C();
     // ESP_LOGI("SYSTEM", "Init i2c with MPU6050 complete");
     wifi_init_sta();
     // ESP_LOGI("SYSTEM", "Init wifi complete");
-    init_leg(&left_leg, FRONT_LEFT_SERVO, BACK_LEFT_SERVO, 0);
+    esp_err_t ret = init_leg(&left_leg, FRONT_LEFT_SERVO, BACK_LEFT_SERVO, 0);
+    if (ret != ESP_OK) {
+        ESP_LOGE("MAIN", "Failed to initialize left leg: %s", esp_err_to_name(ret));
+        abort();
+    }
     init_leg(&right_leg, FRONT_RIGHT_SERVO, BACK_RIGHT_SERVO, 1);
+    if (ret != ESP_OK) {
+        ESP_LOGE("MAIN", "Failed to initialize right leg: %s", esp_err_to_name(ret));
+        abort(); 
+    }
+
     ESP_LOGI("SYSTEM", "Init legs complete");
     xTaskCreate(tcp_server_task, "tcp_server", 4096, NULL, 5, NULL);
 
+    int servo_angles[4];
+
     while(1) {
-        if(xQueueReceive(rxQueue, &msg_buffer, (TickType_t)0) != pdPASS) {
-            vTaskDelay(pdMS_TO_TICKS(300));
-        } else {
-            int index = 0;
-            int servo_angles[4];
-            std::stringstream ss(msg_buffer);
-            std::string token;
-            while (std::getline(ss, token, ',') && index < 4) {
-                servo_angles[index++] = std::stoi(token);  // Convert to int
-            }
-            ESP_LOGI("SYSTEM", "values: %i,%i,%i,%i", servo_angles[0], servo_angles[1], servo_angles[2], servo_angles[3]);
-            set_servo_angle(&left_leg, true, servo_angles[0]);
-            set_servo_angle(&left_leg, false, servo_angles[1]);
-            set_servo_angle(&right_leg, true, servo_angles[2]);
-            set_servo_angle(&right_leg, false, servo_angles[3]);
-
-            memset(msg_buffer, 0, sizeof(msg_buffer));
+        xQueueReceive(rxQueue, &msg_buffer, portMAX_DELAY);
+        int index = 0;
+        std::stringstream ss(msg_buffer);
+        std::string token;
+        while (std::getline(ss, token, ',') && index < 4) {
+            servo_angles[index++] = std::stoi(token);  // Convert to int
         }
+        ESP_LOGI("SYSTEM", "values: %i,%i,%i,%i", servo_angles[0], servo_angles[1], servo_angles[2], servo_angles[3]);
+
+        set_servo_angle(&left_leg.front_servo, servo_angles[0]);
+        ESP_LOGI("TEST", "Hit 0");
+        set_servo_angle(&left_leg.rear_servo, servo_angles[1]);
+        ESP_LOGI("TEST", "Hit 1");
+        set_servo_angle(&right_leg.front_servo, servo_angles[2]);
+        ESP_LOGI("TEST", "Hit 2");
+        set_servo_angle(&right_leg.rear_servo, servo_angles[3]);
+        ESP_LOGI("TEST", "Hit 3");
+
+        memset(msg_buffer, 0, sizeof(msg_buffer));
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
-
-
-    // int ag1 = 33;
-    // int ag2 = 77;
-    // while(1) {
-    //     vTaskDelay(pdMS_TO_TICKS(1000));
-    //     set_servo_angle(&right_leg, true, ag1);
-    //     vTaskDelay(pdMS_TO_TICKS(1000));
-    //     set_servo_angle(&right_leg, true, ag2);
-    // }
 }

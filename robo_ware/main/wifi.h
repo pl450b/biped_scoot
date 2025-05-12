@@ -14,6 +14,8 @@ void wifi_init_sta(void);
 
 void tcp_server_task(void *pvParameters);
 
+void connection_start(int tcp_socket);
+
 #ifdef __cplusplus
 }
 #endif

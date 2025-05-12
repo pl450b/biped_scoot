@@ -40,7 +40,6 @@ extern QueueHandle_t rxQueue;
 static const char *TAG = "WIFI";
 static TaskHandle_t upd_Handle = NULL;
 
-
 /* FreeRTOS event group to signal when we are connected/disconnected */
 static EventGroupHandle_t s_wifi_event_group;
 
@@ -143,26 +142,30 @@ static void udp_client_task(void *pvParameters)
         setsockopt (sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout);
 
         ESP_LOGI(TAG, "Socket created, sending to %s:%d", ip_addr_str, PORT);
-
-        while (sock != -1) {
-
-            int err = sendto(sock, payload, strlen(payload), 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
-            if (err < 0) {
-                ESP_LOGE(TAG, "Error occurred during sending: errno %d", errno);
+        
+        bool temp_alive = true;
+        uint32_t notify_val;
+        while (1) {
+            
+            for(int i = 0; i < 100; i++) {
+                sendto(sock, payload, strlen(payload), 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
+                vTaskDelay(10 / portTICK_PERIOD_MS);
+            }
+            
+            if (xTaskNotifyWait(0x00, 0xFFFFFFFF, &notify_val,0) == pdTRUE) {
+                temp_alive = false;
                 break;
             }
-            ESP_LOGI(TAG, "Message sent");
-
-
-            vTaskDelay(10 / portTICK_PERIOD_MS);
         }
 
         ESP_LOGE(TAG, "Shutting down socket and retrying...");
         shutdown(sock, 0);
         close(sock);
+        if(!temp_alive) { // if the tcp socket is off, kill this task
+            vTaskDelete(NULL);
+        }
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
-    vTaskDelete(NULL);
 }
 
 void tcp_server_task(void *pvParameters)
@@ -234,30 +237,24 @@ void tcp_server_task(void *pvParameters)
 
         ESP_LOGI(TAG, "Socket accepted ip address: %s", addr_str);
 
-        // TODO: put functions here
         strcpy(msg_buffer, "Enter passwd: ");
         send(sock, msg_buffer, strlen(msg_buffer), 0);
 
         int received = recv(sock, msg_buffer, strlen(msg_buffer), 0);
+        if(received == 0) {
+            close(sock);
+            continue;
+        }
         msg_buffer[received-1] = '\0'; 
 
+        // Password Check
         if(strcmp(msg_buffer, ROBO_PASS) == 0) {
             strcpy(msg_buffer, "Password corret, you may now send commands\n");
             send(sock, msg_buffer, strlen(msg_buffer), 0);
-
-            xTaskCreate(udp_client_task, "udp_socket", 4096, addr_str, 5, &upd_Handle);
-            
-            while(1) {
-                vTaskDelay(pdMS_TO_TICKS(500));
-                received = recv(sock, msg_buffer, sizeof(msg_buffer), MSG_DONTWAIT);
-                    if (received == 0) {
-                        ESP_LOGI(TAG, "Client disconnected.");
-                        vTaskDelete(upd_Handle);
-                        shutdown(sock, 0);
-                        close(sock);
-                        break;
-                    }
-            }
+            // Start sending sensor data through UDP socket
+            xTaskCreate(udp_client_task, "udp_socket", 4096, addr_str, 5, &upd_Handle);   
+            // Start reading commands from socket
+            connection_start(sock);         
         } else{ 
             ESP_LOGE(TAG, "Wrong password, got %s", msg_buffer);
             strcpy(msg_buffer, "Wrong password, goodbye");
@@ -270,4 +267,32 @@ void tcp_server_task(void *pvParameters)
 CLEAN_UP:
     close(listen_sock);
     vTaskDelete(NULL);
+}
+
+void connection_start(int tcp_socket) {
+    // Send instructions    
+    char tx_buffer[] = "Send servo commands in the following format:\n\
+    <front left>,<rear left>,<front right>,<rear right>\n";
+    
+    send(tcp_socket, tx_buffer, strlen(tx_buffer), 0);                         
+    
+    // Read for incoming instructions
+    while(1) {
+        char rx_buffer[128]; 
+        int received = recv(tcp_socket, rx_buffer, sizeof(rx_buffer)-1, 0);
+        if (received == 0) {
+            xTaskNotify(upd_Handle, (uint32_t)0, eNoAction);
+            break;
+        } else if (received < 0) {
+            ESP_LOGE(TAG, "Socket recv error %i, exiting", received);
+            close(tcp_socket);
+            break;
+        } else {
+            BaseType_t tx_err = xQueueSend(rxQueue, &rx_buffer, (TickType_t)10);
+            if(tx_err != pdPASS) {
+                ESP_LOGE(TAG, "push failed with error %i", tx_err);
+            }
+        }
+    }
+
 }
