@@ -32,16 +32,19 @@ inline uint32_t angle_to_compare(int angle)
 esp_err_t init_servo(servo_config_t *servo, mcpwm_oper_handle_t oper, int gpio_num) {
     esp_err_t ret;
 
+    // Establish Comparator
     memset(&servo->comparator_config, 0, sizeof(servo->comparator_config));
     servo->comparator_config.flags.update_cmp_on_tez = true;
     ret = mcpwm_new_comparator(oper, &servo->comparator_config, &servo->comparator);
     if (ret != ESP_OK) return ret;
 
+    // Establish Generator
     memset(&servo->generator_config, 0, sizeof(servo->generator_config));
     servo->generator_config.gen_gpio_num = gpio_num;
     ret = mcpwm_new_generator(oper, &servo->generator_config, &servo->generator);
     if (ret != ESP_OK) return ret;
 
+    // Set to center angle
     ret = mcpwm_comparator_set_compare_value(servo->comparator, angle_to_compare(0));
     if (ret != ESP_OK) return ret;
 
@@ -101,14 +104,10 @@ esp_err_t set_servo_angle(servo_config_t* servo, int angle) {
         return ESP_FAIL;
     }
 
-    ESP_LOGI(SERVO_TAG, "Servo and comparator exist");
-
     if (angle < SERVO_MIN_DEGREE || angle > SERVO_MAX_DEGREE) {
         ESP_LOGW("SERVO", "Angle %d out of bounds", angle);
         return ESP_ERR_INVALID_ARG;
     }
-
-    ESP_LOGI(SERVO_TAG, "Angle good");
 
     servo->current_angle = angle;
     ESP_ERROR_CHECK(mcpwm_comparator_set_compare_value(servo->comparator, angle_to_compare(angle)));

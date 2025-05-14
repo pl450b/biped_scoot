@@ -36,7 +36,35 @@ QueueHandle_t rxQueue;
 
 leg_t left_leg;
 leg_t right_leg;
-char msg_buffer[100];
+
+
+void socket_to_queue(void *pvParameters) {
+    int index = 0;
+    int servo_angles[4];
+    char msg_buffer[128];
+
+    while(1) {
+        xQueueReceive(rxQueue, &msg_buffer, portMAX_DELAY);
+      
+        index = 0;
+        std::stringstream ss(msg_buffer);
+        std::string token;
+        while (std::getline(ss, token, ',') && index < 4) {
+            servo_angles[index++] = std::stoi(token);  // safe conversion
+        }
+
+        if (index == 4) {
+            ESP_LOGI("SYSTEM", "values: %i,%i,%i,%i", servo_angles[0], servo_angles[1], servo_angles[2], servo_angles[3]);
+            set_servo_angle(&left_leg.front_servo, servo_angles[0]);
+            set_servo_angle(&left_leg.rear_servo,  servo_angles[1]);
+            set_servo_angle(&right_leg.front_servo, servo_angles[2]);
+            set_servo_angle(&right_leg.rear_servo,  servo_angles[3]);
+        } else {
+            ESP_LOGW("SYSTEM", "Received incomplete data (%d angles)", index);
+        }
+        memset(msg_buffer, 0, sizeof(msg_buffer));
+    }
+}
 
 void app_main()
 {
@@ -55,7 +83,8 @@ void app_main()
         ESP_LOGE("MAIN", "Failed to initialize left leg: %s", esp_err_to_name(ret));
         abort();
     }
-    init_leg(&right_leg, FRONT_RIGHT_SERVO, BACK_RIGHT_SERVO, 1);
+    // init_leg(&right_leg, FRONT_RIGHT_SERVO, BACK_RIGHT_SERVO, 1);
+    init_leg(&right_leg, BACK_RIGHT_SERVO, FRONT_RIGHT_SERVO, 1);
     if (ret != ESP_OK) {
         ESP_LOGE("MAIN", "Failed to initialize right leg: %s", esp_err_to_name(ret));
         abort(); 
@@ -63,29 +92,5 @@ void app_main()
 
     ESP_LOGI("SYSTEM", "Init legs complete");
     xTaskCreate(tcp_server_task, "tcp_server", 4096, NULL, 5, NULL);
-
-    int servo_angles[4];
-
-    while(1) {
-        xQueueReceive(rxQueue, &msg_buffer, portMAX_DELAY);
-        int index = 0;
-        std::stringstream ss(msg_buffer);
-        std::string token;
-        while (std::getline(ss, token, ',') && index < 4) {
-            servo_angles[index++] = std::stoi(token);  // Convert to int
-        }
-        ESP_LOGI("SYSTEM", "values: %i,%i,%i,%i", servo_angles[0], servo_angles[1], servo_angles[2], servo_angles[3]);
-
-        set_servo_angle(&left_leg.front_servo, servo_angles[0]);
-        ESP_LOGI("TEST", "Hit 0");
-        set_servo_angle(&left_leg.rear_servo, servo_angles[1]);
-        ESP_LOGI("TEST", "Hit 1");
-        set_servo_angle(&right_leg.front_servo, servo_angles[2]);
-        ESP_LOGI("TEST", "Hit 2");
-        set_servo_angle(&right_leg.rear_servo, servo_angles[3]);
-        ESP_LOGI("TEST", "Hit 3");
-
-        memset(msg_buffer, 0, sizeof(msg_buffer));
-        vTaskDelay(pdMS_TO_TICKS(10));
-    }
+    xTaskCreate(socket_to_queue, "sock_queue", 4096, NULL, 5, NULL);   
 }
